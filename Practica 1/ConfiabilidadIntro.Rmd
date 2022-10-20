@@ -1,0 +1,288 @@
+---
+title: "Estimación práctica de Confiabilidad"
+author: "Hector Najera"
+date: "30/11/2022"
+output:
+   html_document:
+    theme: readable
+    highlight: haddock
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Introducción
+
+Esta nota técnica ilustra lla forma de calcular los diferentes estimadores de confiabilidad usando distintos datos con **R**. Usaremos datos simulados y "reales". Los primeros nos ayudarán a revisar el cómputo de manera más limpia. Una vez que tengamos una base más clara, vamos a movernos al ejemplo con datos reales. 
+
+
+# Paquetes necesarios
+
+Vamos a usar tres paquetes. Si no los tienes instalados tendrías que escribir `install.packages("lavaan")`, por ejemplo. Una vez instalados los puedes llamar con `library(lavaan)`
+
+```{r}
+library(lavaan)
+library(haven)
+library(descr)
+```
+
+
+# Estimación de confiabilidad con datos simulados
+
+Primero usaremos el archivo "Rel\_MD\_data\_1\_1.dat". Estos datos los podemos cargar con `read.table()`. Como los datos no vienen "pulidos", vamos a asignarle nombres a las variables con la función `colnames()`. Estos datos los vamos a usar más abajo, así que los vamos a guardar en el objeto llamado `D1`. 
+
+```{r}
+D1<-read.table("Rel_MD_data_1_1.dat")
+colnames(D1)<-c("x1","x2","x3","x4","x5","x6",
+                      "x7","x8","x9","x10","x11",
+                      "resources","educ_yr","occupation","hh_members","class")
+```
+
+```{r}
+colMeans(D1[,1:9])*100
+```
+
+## Estimación de confiabilidad a partir de un modelo estructural (SEM) -Confirmatory Factor Model-.
+
+Para ilustrar el cálculo de $\omega$ y $\omega_h$, vamos a usar los datos `D1`. Los pasos de la estimación son los siguientes: 
+1. ¿Cuál es la estructura del modelo? ¿Cómo se clasifican las variables? ¿Cuántas dimensiones?
+
+1.1 ¿Está estadísticamente identificado el modelo? (i.e. Tengo suficiente información para estimar la variable latente -al menos tres indicadores por variable latente-. De otra manera el modelo está sub-identificado. 
+
+1.2 ¿Cuál es la escala de las variables? ¿Continua o categorías?
+
+1.3 ¿Qué hipótesis hay sobre la relación de los indicadores con la variable latente? (Equivalencia Tau, paralelismo, congéneres). 
+
+2. Especificación del modelo en R. Escribir el modelo.
+
+3. Estimación en R: `lavaan`.
+
+4. Evaluar si el modelo tiene buen ajuste: TLI>.95, CFI>.95, RMSEA<.06
+
+4.1 Evaluar problemas potenciales: Signos, tamaño de las cargas factoriales. 
+
+5. Revisar las $\lambda$'s -i.e. cargas factoriales, $\lambda^2$ la variabilidad explicada por el factor 
+
+6. Estimación de $omega$ con el paquete `semTools`. 
+
+7. Interpretación y toma de decisiones
+
+### Modelo nulo: Unidimensional
+
+Siempre es buena idea estimar un modelo nulo i.e. el modelo más sencillo para tenerlo como referencia. 
+
+#### Especificación del modelo
+
+Vamos a trabajar con un modelo de 9 variables (x1-x9) y lo vamos a guardar con el siguiente nombre: `UD_model`. Aquí la `h` es la variable latente -le puedes poner como quieras- y las `x's` son los indicadores. 
+
+```{r  echo=TRUE, message=FALSE, warning = FALSE}
+UD_model <- ' h =~ +x1+x2+x3+x4+x5+x6+x7+x8+x9 '
+```
+
+#### Estimación del modelo con lavaan
+
+Una vez que estamos seguros que hemos escrito correctamente el modelo, podemos usar la función `sem()` de `lavaan` para estimar nuestro modelo `UD_model`. La función require: el modelo, los datos y el tipo de variables -en el caso de variables discretas/categóricas-. Además le pongo que quiero cargas factoriales estandarizadas. La opción `ordered` le indica a la función `sem()` que las variables son categóricas y `std.lv` que las cargas sí las queremos estandarizadas. 
+
+Guardaremos los resultados en el objeto llamado `fit1`. 
+
+```{r  echo=TRUE, message=FALSE, warning = FALSE}
+fit1 <- sem(UD_model, data = D1, 
+           ordered=c("x1","x2","x3","x4","x5",
+                     "x6","x7","x8","x9"),
+           std.lv=TRUE)
+```
+
+#### Evaluación global
+
+El objeto fit1 tiene todos los resultados del modelo: ajuste global, parámetros, las matrices para los cálculos, etc. 
+
+Así que las salidas (output) tiene mucha información. A continuación lo más destacable: 
+
+1. Model Test User Model: Este es el test absoluteo de ajuste -útile para muestras pequeñas-. En casi todos los casos, los modelos se rechazan por $\chi^2$ 
+
+2. Model Test Baseline Model: Este es el peor de los casos y se utiliza para calcular TLI y CFI. Se compara un modelo malo con nuestro modelo y vemos qué tan bueno es. 
+
+3. User Model versus Baseline Model: Aquí tenemos tanto TLI como CFI, ambos muy cerca pero ligeramente abajo de los valores aceptables  (Brosseau-Liard, P. E., Savalei, V., and Li, L. (2012)). 
+
+4. Root Mean Square Error of Approximation: Si <.06, el modelo tiene problemas 
+
+```{r}
+summary(fit1, fit.measure=TRUE, ci=TRUE, nd=3) 
+```
+
+#### Evaluación de las cargas factoriales
+
+5. Latent Variables: Aquí se muestran las cargas factoriales estandarizadas, toma $\lambda^2$ y lo que obtienes es eñ % de la varianza atribuible a la variable altente. Son muy altas en todos los casos
+
+6. Thresholds: z-scores, el valor de la variable latente que tendríamos que exceder para tener carencia==1. Estos son para variables binarias, por eso tenemos t1. 
+
+7. Variances: Errores aleatorios de cada indicador. $1-\lambda^2$
+
+
+#### Estimación de omega 
+
+La estimación de omega se ha hecho factible muy recientemente -y es más reciente para variables categóricas-. En R hay dos paquetes que nos permiten hacer estimación de omega: `psych and semTools`. Sin embargo, recientemente, se descubrió que el algoritmo para estimar omega para variables categóricas estaba sesgado hacia arriba, especialmente para niveles bajos de confiabildidad. El trabajo teórico estaba en 2009 pero tomó una década diseñar la implementación del ajuste.
+
+
+El paquete `psych` es genial, pero no debe usarse para variables categóricas. Esta bien apra variables continuas y análisis explroatorios pero no para confirmatorios. Para variables categóricas tenemos que usar `semTools`. Además este paquete tiene diferentes variantes de omega: total, hierarchical, per dimension, per level. 
+
+La función `reliability` de `semTools` estima cinco estadísticos:  \alpha -ordinal alpha (Zumbo et al, 2007), $\omega$, $\omega_2$, $\omega_3$ and avevar -average extracted variance by the items-. $\omega_3 = \omega_t$ estimador de confiabilidad de la varianza total de X. Los otros omegas usan la varianza del modelo -scala del factor-. Si el modelo es heterogéneo, la varianza del modelo sera distinta a la varianza total observada. 
+
+```{r}
+library(semTools)
+reliability(fit1)
+```
+
+### Modelo jerárquico
+
+Vimos que el ajuste global del modelo nulo no era ideal. Ahora, vamos a suponer que nuestra teoría establece que la medida es jerárquica: hay un factor de alto orden con tres subdimensiones y tres indicadores por dimension. 
+
+#### Especificación del modelo
+
+Este modelo establece que hay tres factores F1, F2 y F3, anidados en un factor de alto orden con tres indicadores. Guardaremos los resultados en el objeto `MD_model`.
+
+```{r  echo=TRUE, message=FALSE, warning = FALSE}
+MD_model <- ' h =~ F1+F2+F3
+                F1=~   x7 + x8 + x9        
+                F2=~   x4 + x5 + x6         
+                F3=~   x1 + x2 + x3
+
+'
+```
+
+#### Estimación del modelo con lavaan
+
+Para estimar el modelo de arriba simplemente tenemos que reemplazarlo en la función `sem` porque los argumentos son los mismos. Guardaremos los resultados en fit2.
+
+```{r  echo=TRUE, message=FALSE, warning = FALSE}
+fit2 <- sem(MD_model, data = D1, 
+           ordered=c("x1","x2","x3","x4","x5",
+                     "x6","x7","x8","x9"),
+           std.lv=TRUE)
+```
+
+#### Evaluación global del modelo multidimensional
+
+Este modelo tiene mucho mejor ajuste. Es casi perfecto! Es demasiado bueno para ser "real"... La razón es que los datos simulados tienen dicha estructura, y el modelo representa el mecanismo generador de datos. Esto significa que la estadística que está por detrás funciona. 
+
+```{r}
+summary(fit2, fit.measure=TRUE, ci=TRUE) 
+```
+
+#### Revisamos las cargas factoriales
+
+Para modelos multidimensionales las cargas son más difíciles de interpretar. Los resultados muestras las cargas factoriales estandarizadas dentro de cada dimension y no estandarizadas de cada dimensión. Para extraer la varianza total explicada por el factor de alto orden y las dimensiones, tenemos que usar el siguiente código -fijénse que el output es confuso por que dice h=0. En la mayoría de los casos más del 90% de la varianza se explica por los factores:  
+
+```{r}
+inspect(fit2,what="std")$lambda
+```
+
+#### Estimación de omega
+
+Debido a que se trata de un modelo multidimensional, tenemos que estimar tanto omega_t como omega_h. Esto puede hacerse usando la función `reliabilityL2`. Tenemos que especificar el nombre del factor de alto orden `h`. 
+
+1. OmegaL1: % de los scores totales que se atribuyen al factor de alto orden. 
+2. Omegal2: % de la varianza de los factores de primer orden que es atribuible al factor de alto orden.  
+3. PartialOmegaL1: Hipotético. % de la varianza explicada por el factor de alto orden si los indicadores no tuvieran error. 
+
+```{r}
+reliabilityL2(fit2, "h")
+```
+
+## Ejemplo con datos reales
+
+Usaremos datos de la DHS de pakistan, los cuales se utilizan para calcular el Indice Multidimensional de pobreza de PNUD.
+
+## Confiabildiad a partir de un modelo estructural
+
+Los datos vienen en formato stata. Para ello necesitamos la función `read_dta` del paquete `haven`. Después, simplemente importamos los datos y los guardamos en Dp. 
+
+```{r}
+Dp<-read_dta("MPI_pakistandhssample.dta")
+names(Dp)
+```
+
+### Modelo nulo
+
+#### Especificación
+
+```{r}
+MPIUD_model <- ' h =~ d_cm+d_nutr+d_satt+d_educ+d_elct+d_wtr+d_sani+d_hsg+d_ckfl+d_asst'
+```
+
+```{r}
+fitMPI <- sem(MPIUD_model, data = Dp, 
+           ordered=TRUE,
+           std.lv=TRUE, sampling.weights = "weight")
+```
+
+Nota: los códigos están volteados no carente=1. 
+
+```{r}
+freq(Dp$d_elct, plot=F)
+freq(Dp$d_hsg, plot=F)
+```
+
+```{r}
+summary(fitMPI, fit.measure=TRUE, ci=TRUE) 
+```
+
+```{r}
+reliability(fitMPI)
+```
+
+### Caso multidimensional
+
+Uno de los problemas con los MPI´s es que no están identificados. Educación y salud sólo tienen dos indicadores. Para parcialmente darle la vuelta a este problema es necesario fijar algunas cargas factoriales, i.e. decirle al modelo que no las estime. 
+
+Para dejarlas fijas usamos `1*H`, lo que significa es que tal factor ya no es un parámetro a estimar. 
+
+```{r}
+MPIMD_model <- ' P =~ 1*H+E+LS
+                H =~ 1*d_cm+d_nutr
+                E =~ 1*d_satt+d_educ
+                LS=~ d_elct+d_wtr+d_sani+d_hsg+d_ckfl+d_asst'
+```
+
+Ahora estimaremos nuestro modelo con la función `sem()`. Como los datos vienen de una encuesta, incorporaremos los pesos con `sample.weights`. Hay mejores formas de hacerlo con Mplus o `lavaan.survey`
+
+```{r}
+fitMPI2 <- sem(MPIMD_model, data = Dp, 
+           ordered=TRUE,
+           std.lv=TRUE, sampling.weights = "weight")
+```
+
+Ahora vemos el ajuste global
+
+```{r}
+summary(fitMPI2, fit.measure=TRUE, ci=TRUE) 
+```
+
+Omega debe estimarse de modelos con buen ajuste. Para ilustrar estimaremos los valores para el MPI. 
+
+Ya habíamos visto que el modelo unidimensional hacía más sentido. 
+
+
+```{r}
+reliabilityL2(fitMPI2, "P")
+```
+
+
+# Opcional
+
+Modelo simple CONEVAL: Seis indicadores: ic_rezedu, ic_segsoc, ic_asalud, ic_ali,  ic_cv  y ic_sbv
+
+
+
+```{r}
+library(haven)
+Dm<-read_dta("pobreza_14sample.dta")
+names(Dm)
+```
+
+
+
+
+
+

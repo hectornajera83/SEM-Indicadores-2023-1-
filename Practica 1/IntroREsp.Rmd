@@ -1,0 +1,163 @@
+---
+title: "Intro to R-software"
+author: "Hector Najera"
+date: "01/12/2021"
+output:
+   html_document:
+    theme: readable
+    highlight: haddock
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introducción
+
+Esta nota brinda una introucción MUY BÁSICA a algunos aspectos esenciales de R. Se enfoca en lo siguiente:
+
+1. Establecer su directorio de trabajo
+2. Operaciones básicas
+3. Creación de objetos
+4. Importación de datos
+5. Manipulaciones sencillas 
+
+Estos cinco aspectos cubren las operaciones sencillas para estimar confiabilidad y validez pero es mejor trata de replicar estas notas con otros datos. 
+
+# Operaciones básicas con objetos 
+
+La **consola** es un espacio reservado para interactuar con R. Presentaremos algunos comandos básicos para tener una mejor idea de cómo funciona la consola y cómo se traduce la información de entrada en objetos.
+
+Pensemos en una de las operaciones más simples posibles, como sumar dos números. Digamos que estás interesado en agregar *uno más uno* y mantener el resultado. Para fines de demostración, llamaremos al objeto donde almacena el resultado como 'two'. Es posible que note este símbolo '<-'. Ese símbolo representa pasar una operación a un objeto, funciona como el símbolo '='. 
+
+Puedes usar cualquier nombre que te guste, por ejemplo, 't'. Aunque los nombres son diferentes, el resultado es el mismo.
+
+ 
+
+```{r}
+two<-1+1
+t<-1+1
+```
+
+¿Por qué quisieras almacenar algo tan simple como *uno más uno*? Pues bien, el poder de R se basa en su capacidad de manipular objetos de forma sistemática. Un objeto podría ser un carácter, vector, base de datos, un conjunto de bases de datos -listas- o algo aún más complejo como un algoritmo para estimar un modelo jerárquico espacio-temporal. La lógica es más o menos la misma.
+
+
+Puedes, por ejemplo, sumar los dos objetos que ha creado `t+two`, o puedes salvarlo en otro objeto `Myobject`. 
+
+```{r}
+t+two
+Myobject<-t+two
+```
+
+Porque los objetos son solo un producto de diferentes elementos. Podemos crear nuestro propio conjunto de datos. Imagínese, está rellenando filas y columnas en una hoja de cálculo. Crearemos un `data.frame`, un tipo de objeto que es particularmente útil en la investigación de la pobreza. Básicamente, todos los conjuntos de datos son `data.frame`. `MyData` tiene dos variables `x` y `y` y cinco renglones. En R esto se representa como `[1:5,1:2]`. 
+
+```{r}
+MyData<-data.frame(x=c(1,2,3,4,5),y=c(1,0,1,0,1))
+```
+
+Después de ejecutar el comando anterior, notará que se agregó un nuevo objeto al **Global Enviroment**, que muestra todos los objetos que estamos acumulando durante la sesión.
+
+
+Una de las primeras tareas que hacemos al preparar un dataset para el análisis es crear una nueva variable. En R, el símbolo
+ `$` se utiliza para designar un vector que pertenece a un  `data.frame`. El nuevo vector `z`. Porque queremos que `z` sea una variable de `MyData`, usamos la siguiente sintaxis `MyData$z`. Lo que tenemos que hacer ahora es decirle a R es la operación que da a luz a  `z`. En este caso,  `MyData$x+MyData$y`, la suma simple de dos vectores. 
+
+También crearemos uno llamado `one`, que será una columna de unos.
+
+```{r}
+MyData$z<-MyData$x+MyData$y
+MyData$one<-1
+MyData
+```
+
+Desafortunadamente, no tenemos tiempo para pasar por todas las maravillosas operaciones que podríamos hacer, como fusionar, recodificar, reemplazar, agregar medios, max o min por grupo, etc. Esto será suficiente para seguir adelante por ahora.
+
+# Directorio de trabajo
+
+La función `getwd()` muestra mi directorio de trabajo, para poder cambiarlo y poder leer sus conjuntos de datos utiliza la función  `getwd()`. Si usted es un usuario de Windows, preste atención a la dirección de la
+ */*. Puede utilizar estos  *\* pero necesitas uno doble para que funcione *\\*. 
+
+```{r}
+getwd()
+#setwd("C:/OneDrive/Proyectos Investigacion/EscuelaPobreza2021/Practica")
+```
+
+# Objetos externos
+
+R tiene algunas **funciones precargadas** que importan datos de diferentes formatos sin procesar: *.txt, *.csv, *.delim. Por ejemplo, vamos a importar un conjunto de datos ficticio llamado "DatosEMSA2008.csv" con la función
+ `read.table()`. No tuve que especificar la ubicación del archivo porque mi directorio de trabajo se ha configurado correctamente. 
+
+A menudo, este tipo de datos tiene el nombre de las variables en la parte superior y las columnas se separan con una coma.
+. De ahí la opción  `header` y `sep`. 
+
+Podemos usar la función `head` para inseccionar nuestros datos. 
+
+```{r}
+DEMSA<-read.table("DatosEMSA2008.csv", header = TRUE, sep = ",")
+head(DEMSA)
+```
+
+## Libraries/paquetes
+
+La mayoría de los conjuntos de datos en ciencias sociales se preprocesan en otros programas como stata, spss o incluso Excel. R tiene algunas librerías precargadas, es decir, funciones que nos permiten hacer cosas diferentes. Sin embargo, el poder de R se basa en la gran cantidad de **bibliotecas** o **paquetes** disponibles, que van desde la manipulación de datos 'dplyr', hasta la estimación bayesiana 'rstan'. Estas bibliotecas necesitan ser instaladas -importadas desde internet-. Veamos cómo funciona esto.
+ 
+
+Para importar estos formatos de datos más sofisticados, podemos usar **library** -i.e.  conjunto de funciones: para importar datos. Primero necesitamos instalar el paquete `haven` con la función `install.packages("haven")`. Este paquete se instalará pero no se cargará cuando abramos R -esto hace que R sea más rápido-. Podemos cargar el paquete con la función `library`. 
+
+
+Si quieres saber de qué es capaz `haven`, puedes usar el comando `ls("package:haven")`. También hay mucha documentación en línea al respecto.
+
+Una vez hayamos cargado la librería 'haven' podremos utilizar la función 'read_dta' para importar los datos que se guardaron en formato stata (*.dta). Observe que en el lado derecho en la parte superior, se muestran todos los objetos nuevos. De modo que, podemos abrir múltiples conjuntos de datos en la misma sesión.
+
+
+```{r}
+#install.packages(haven) This is just in the case you don't have it.
+library(haven)
+Dm<-read_dta("pobreza_14sample.dta")
+```
+
+# Basic manipulations of data.frames
+
+Both DEMSA and Dm are objects called *data.frame* within R, i.e. rows a columns with some attributes that can be numeric or string. There are two basic ways of manipulating: by names or by the position of the column. 
+
+```{r}
+Dm$alisalud<-Dm$ic_ali+Dm$ic_asalud
+names(Dm)
+```
+
+Una de las cosas que decepciona a los nuevos usuarios de R es que esperan -con razón- obtener algunas tablas y descriptivos fáciles de sus datos. Sin embargo, las bibliotecas base no son realmente buenas en eso. Afortunadamente, alguien creó el paquete `descr`, un conjunto de funciones que hacen que las tabulaciones y tabulaciones cruzadas sean muy simples y tienen como objetivo replicar tablas SPSS. 
+
+Una vez instalado `descr`, la función `freq()`, le permitirá producir algunas frecuencias básicas. De forma predeterminada, la función produce una gráfica. Todas las funciones en R tienen argumentos precodificados para que funcionen de manera estandarizada. Sin embargo, en algunos casos pueden ser necesarias algunas opciones específicas. Una forma de conocer las opciones que tenemos, es escribiendo `?freq`, esto mostrará la variedad de opciones disponibles para la función en cuestión
+
+```{r}
+library(descr)
+freq(Dm$alisalud)
+```
+
+For example, I don't need the plot. In R, T and F stand for TRUE and FALSE, and these two are very useful to activate and deactivate things. But they are also useful to make logical tests, like in the use of `ifelse` conditionals. 
+
+```{r}
+freq(Dm$alisalud, plot=F)
+```
+
+Otra función útil es `crosstab`, solicitaremos a los marginales solo para tener una idea de la superposición entre estas dos privaciones. Sorprendentemente, la superposición es baja, menos del 4%.
+
+
+```{r}
+crosstab(Dm$ic_ali,Dm$ic_asalud, prop.t =T)
+```
+
+Las estadísticas univariadas o bivariadas son muy sencillas de obtener. Por ejemplo, para estimar la correlación entre las columnas, solo necesita llamar a la función `cor()`. Por defecto, utiliza la correlación de Pearson, puedes usar otras como spearman con la opción de método. Existen otros paquetes más potentes para estimar otros tipos de correlaciones como las correlaciones policóricas o tetracóricas.
+
+
+```{r}
+cor(Dm$ic_ali,Dm$ic_asalud)
+```
+
+Hay otras funciones precargadas que ayudan a hacer cálculos simples. Una de estas funciones es `colMeans()`. Esto estimará las tasas de privación de los indicadores binarios.
+
+
+```{r}
+colMeans(Dm[,c(19,57,30)])*100
+```
+
+Hay paquetes mucho más poderosos como `Rmarkdown, Officedown, flextable`. 
