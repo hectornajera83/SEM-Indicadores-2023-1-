@@ -1,0 +1,131 @@
+---
+title: "Ejercicio: IRT. SEM y medición economico-social"
+author: "Héctor Nájera"
+date: "29/11/2022"
+output: html_document
+---
+
+La EMSA descansa en dos supuestos fundamentales:
+
+1.	La EMSA es unidimensional, i.e. los indicadores son manifestaciones de un mismo constructo.
+2.	Los indicadores miden distintos niveles de severidad de seguridad alimentaria y discriminan equivalentemente (i.e. se trata de un modelo RASCH)
+
+
+## Datos
+
+El archivo `"DatosEMSA2008.csv"` contiene los datos (15 columnas). La primera columna es el id de la persona y las siguientes 12 columnas corresponden a los indicadores binarios de la EMSA (1=Carencia; 0=Sin Carencia), la columna 14 es el identificador de pobreza por ingreso y la columna 15 contiene el total de integrantes del hogar.
+
+
+```{r message=FALSE, include=TRUE, tidy=TRUE}
+D<-read.csv("DatosEMSA2008.csv")
+head(D)
+```
+
+Primero estimamos la prevalencias de cada episodio de hambre o de poca variedad de alimentos. Observamos cierta relación entre la crudeza del episodio de hambre y la proporción de hogares con la carencia. Ha mayor crudeza menor prevalencia. Esto es lo que esperaríamos observar en una escala que busca capturar distintas severidades del fenómeno de interés. 
+
+```{r include=TRUE}
+colMeans(D[,2:13])*100
+```
+
+## Teoría de respuesta al ítem
+
+Nos hemos enfocado en la confiabilidad global de los scores. Sin emabrgo, no tenemos mucha idea del tipo de información que aporta cada ítem a los scores globales. Esto es importante porque la EMSA apunta a capturar distintas severidades del fenómenos de interés. Estimaremos primero un modelo **Rasch** puesto que es el modelo teórico que debería representarse en los datos. Este modelo supone que las diferencias de los ítems ocurren en términos de severidad y no de discriminación. Usaremos el paquete `mirt()` y la opción `rasch()`. 
+
+```{r include=TRUE}
+library(mirt)
+
+m<-mirt(D[,2:13], 1, itemtype = 'Rasch')
+```
+
+Ahora inspeccionamos los parámetros con la función `coef`.
+
+```{r message=FALSE}
+coef(m, IRTpars = T, simplify = T)
+```
+
+Los ítems de la EMSA parecen capturar distintos grados de severidad. Observamos que los ítems de adultos tienenden a ser menos severos (a la izquierda) que los de infancia. Parece razonable el supuesto de la EMSA. Sin embargo, las distancia entre varias de las curvas son pequeñas y algunas se traslpan. Esto significa que algunos de los indicadores son redundantes.
+
+```{r message=FALSE}
+plot(m, type = "trace")
+```
+
+Si queremos ver todos los indicadores
+
+```{r message=FALSE}
+plot(m, type = 'trace', auto.key = FALSE, which.items = 1:12, facet_items=FALSE)
+```
+
+### Mejores gráficas con `ggplot2`
+
+```{r message=FALSE}
+plt <- plot(m, type = 'trace', facet_items=FALSE) #store the object
+#print(plt) #plot the object
+#str(plt) #find the data
+#plt$panel.args
+pltdata <- data.frame(lapply(plt$panel.args, function(x) do.call(cbind, x))[[1]])
+pltdata$item <- rep(colnames(D[,2:13]), each = 200)
+head(pltdata)
+
+library(ggplot2)
+ggplot(pltdata, aes(x, y, colour=item)) + geom_line() + ggtitle('ggplot2 Tracelines') +
+    xlab(expression(theta)) + ylab(expression(P(theta)))
+```
+
+
+## Modelo de dos parámetros
+
+Ahora estimamos un modelo de teoría de respuesta al ítem de dos parámetros. Cambiamos el argumento `itemtype="2PL"`. 
+
+Es decir, relajamos el supuesto de que la dificultad es la misma para todos los ítems. Observamos que el supuesto del modelo rasch no parece sostenerse. Las pendientes tienender a ser distintas y las curvas de alguos ítem cruzan otras curvas. Ciertos ítems como el *iaa_4* parecen tocar distintos niveles de seguridad alimentaria. Aunque los parámetros de discriminación son distintos, en todos los casos son valores altos $\geq.9$. Esto es consistente con los altos valores de las $\lambda$'s del modelo factorial. 
+
+```{r message=FALSE}
+m2<-mirt(D[,2:13], 1, itemtype = '2PL')
+coef(m2, IRTpars = T, simplify = T)
+```
+
+```{r message=FALSE}
+plot(m2, type = 'trace', auto.key = FALSE, which.items = 1:12, facet_items=FALSE)
+```
+
+### Mejores gráficas con GGPLOT
+
+```{r message=FALSE}
+plt <- plot(m2, type = 'trace', facet_items=FALSE) #store the object
+#print(plt) #plot the object
+#str(plt) #find the data
+#plt$panel.args
+pltdata <- data.frame(lapply(plt$panel.args, function(x) do.call(cbind, x))[[1]])
+pltdata$item <- rep(colnames(D[,2:13]), each = 200)
+head(pltdata)
+
+library(ggplot2)
+ggplot(pltdata, aes(x, y, colour=item)) + geom_line() + ggtitle('ggplot2 Tracelines') +
+    xlab(expression(theta)) + ylab(expression(P(theta))) + xlim(c(-3,3))
+```
+
+```{r}
+plot(m2, type = 'trace', auto.key = FALSE, which.items = 4:8, facet_items=FALSE)
+```
+
+Curva total de información
+
+```{r}
+areainfo(m2, c(-2,0), which.items = 1:12)
+Theta <- matrix(seq(-3,3, length.out=1000))
+info <- testinfo(m2, Theta)
+plot(info ~ Theta, type = 'l')
+```
+
+
+## Comparación de modelos
+
+Dado que AICc y BIC son menores para el segundo modelo, concluimos que el segundo modelo es MEJOR! 
+
+```{r}
+anova(m, m2)
+```
+
+
+
+
+
